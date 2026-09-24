@@ -1,0 +1,16 @@
+{
+  "name": "mock-interview-platform-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Full-stack AI Mock Interview Platform for College Students",
+  "scripts": {
+    "start": "concurrently \"npm run start --prefix backend\" \"npm run dev --prefix frontend\"",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "install:all": "npm install --prefix frontend && npm install --prefix backend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
+
