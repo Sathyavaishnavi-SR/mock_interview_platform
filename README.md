@@ -93,7 +93,7 @@ mock-interview-platform/
 
 - **Frontend:** React (Vite), React Router DOM, React Three Fiber (`@react-three/fiber`), Three.js (`three`), Drei (`@react-three/drei`).
 - **Backend:** Node.js, Express.js, Cors, Dotenv.
-- **Database (Future):** Supabase.
+- **Database :** Mongo db.
 - **AI (Future):** Express API integration with LLM services.
 
 ---
