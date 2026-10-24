@@ -16,7 +16,7 @@ export default function HeroSection() {
       <div className="container hero-grid">
         <div className="hero-content">
           <div className="hero-badge">
-            <span style={{ fontSize: '1.1rem' }}>✨</span> AI-Driven Interview Preparation
+            AI-Driven Interview Preparation
           </div>
 
           <h1 className="hero-title">

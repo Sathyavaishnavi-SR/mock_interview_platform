@@ -2,16 +2,22 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardSidebar from '../components/DashboardSidebar';
 import Auth3D from '../three/Auth3D';
+import SuccessModal from '../components/SuccessModal';
+import { apiRequest } from '../services/api';
 
 export default function PostInterviewQuestions() {
   const navigate = useNavigate();
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [serverError, setServerError] = useState('');
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [popupMessage, setPopupMessage] = useState('');
 
   const [formData, setFormData] = useState({
     company: '',
     role: '',
     interviewRound: '',
-    interviewYear: '',
+    interviewDate: '',
     question: '',
     topic: '',
     questionType: '',
@@ -29,27 +35,64 @@ export default function PostInterviewQuestions() {
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: '' }));
     }
+    setServerError('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setServerError('');
+
     const newErrors = {};
     if (!formData.company.trim()) newErrors.company = 'Please enter the company name.';
     if (!formData.role.trim()) newErrors.role = 'Please enter the role / position.';
     if (!formData.interviewRound) newErrors.interviewRound = 'Please select the interview round.';
+    if (!formData.interviewDate) newErrors.interviewDate = 'Please select the interview date.';
     if (!formData.question.trim()) newErrors.question = 'Please enter the interview question.';
     if (formData.question.length > 500) newErrors.question = 'Question must be 500 characters or less.';
     if (!formData.topic) newErrors.topic = 'Please select a topic.';
     if (!formData.questionType) newErrors.questionType = 'Please select a question type.';
     if (!formData.memory) newErrors.memory = 'Please indicate how accurately you remember the question.';
-    // answerNotes optional length check
     if (formData.answerNotes.length > 1000) newErrors.answerNotes = 'Answer / notes must be 1000 characters or less.';
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
-    console.log('Question Submitted (frontend simulation):', formData);
-    setIsSubmitted(true);
+
+    const payload = {
+      company: formData.company.trim(),
+      role: formData.role.trim(),
+      interviewRound: formData.interviewRound,
+      interviewDate: formData.interviewDate,
+      question: formData.question.trim(),
+      topic: formData.topic,
+      questionType: formData.questionType,
+      difficulty: formData.difficulty,
+      memory: formData.memory,
+      answerNotes: formData.answerNotes ? formData.answerNotes.trim() : '',
+    };
+
+    setLoading(true);
+    try {
+      const response = await apiRequest('/submissions/questions', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+
+      if (response.success) {
+        setShowSuccessPopup(true);
+        setPopupMessage(
+          'Your question has been submitted successfully.\n\nIt will be reviewed and approved/rejected by the admin.\n\nThank you for contributing!'
+        );
+        setIsSubmitted(true);
+      } else {
+        setServerError(response.message || 'Failed to submit question. Please try again.');
+      }
+    } catch (err) {
+      setServerError('Something went wrong. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClearForm = () => {
@@ -63,7 +106,7 @@ export default function PostInterviewQuestions() {
       company: '',
       role: '',
       interviewRound: '',
-      interviewYear: '',
+      interviewDate: '',
       question: '',
       topic: '',
       questionType: '',
@@ -73,6 +116,7 @@ export default function PostInterviewQuestions() {
       status: 'pending',
     });
     setErrors({});
+    setServerError('');
   };
 
   // Options
@@ -143,14 +187,13 @@ export default function PostInterviewQuestions() {
             Share questions you remember from interviews and help build a better question bank for students.
           </p>
           <div className="subtle-notice">
-            <span>ℹ️</span> Submit individual questions you remember from interviews. Each question will be reviewed by an admin before it becomes part of the approved question bank.
+            Submit individual questions you remember from interviews. Each question will be reviewed by an admin before it becomes part of the approved question bank.
           </div>
         </header>
 
         {isSubmitted ? (
           <div className="setup-container">
             <div className="glass-panel confirmation-box">
-              <div className="confirmation-icon">✅</div>
               <span className="confirmation-badge">Pending Review</span>
               <h2 className="dash-section-title" style={{ marginTop: '1rem', marginBottom: '0.5rem' }}>
                 Question Submitted
@@ -224,16 +267,16 @@ export default function PostInterviewQuestions() {
                     {errors.interviewRound && <span className="form-error">{errors.interviewRound}</span>}
                   </div>
                   <div className="form-group">
-                    <label htmlFor="interviewYear" className="form-label">Interview Year <span className="optional-badge">(Optional)</span></label>
+                    <label htmlFor="interviewDate" className="form-label">Interview Date <span className="required-star">*</span></label>
                     <input
-                      type="number"
-                      id="interviewYear"
-                      name="interviewYear"
-                      value={formData.interviewYear}
+                      type="date"
+                      id="interviewDate"
+                      name="interviewDate"
+                      value={formData.interviewDate}
                       onChange={handleInputChange}
-                      placeholder="e.g. 2023"
-                      className="form-input"
+                      className={`form-input ${errors.interviewDate ? 'input-error' : ''}`}
                     />
+                    {errors.interviewDate && <span className="form-error">{errors.interviewDate}</span>}
                   </div>
                 </div>
               </div>
@@ -352,17 +395,59 @@ export default function PostInterviewQuestions() {
                 </p>
               </div>
 
+              {/* Server Error Message */}
+              {serverError && (
+                <div
+                  style={{
+                    padding: '0.75rem 1rem',
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    border: '1px solid #ef4444',
+                    borderRadius: 'var(--radius-sm)',
+                    color: '#fca5a5',
+                    fontSize: '0.85rem',
+                    marginTop: '1rem',
+                  }}
+                >
+                  {serverError}
+                </div>
+              )}
+
               {/* FORM ACTIONS */}
               <div className="setup-actions" style={{ marginTop: '1.5rem' }}>
-                <button type="submit" className="btn-primary setup-start-btn">Submit Question</button>
-                <button type="button" className="btn-secondary" onClick={handleClearForm}>Clear Form</button>
-                <button type="button" className="btn-secondary setup-back-btn" onClick={() => navigate('/dashboard')}>Cancel</button>
+                <button
+                  type="submit"
+                  className="btn-primary setup-start-btn"
+                  disabled={loading}
+                  style={{ opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}
+                >
+                  {loading ? 'Submitting Question...' : 'Submit Question'}
+                </button>
+                <button type="button" className="btn-secondary" onClick={handleClearForm} disabled={loading}>
+                  Clear Form
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary setup-back-btn"
+                  onClick={() => navigate('/dashboard')}
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
               </div>
             </form>
           </div>
         )}
+        {/* Success Modal Popup */}
+        <SuccessModal
+          isOpen={showSuccessPopup}
+          title="Submitted Successfully"
+          message={popupMessage}
+          onClose={() => {
+            setShowSuccessPopup(false);
+            navigate('/dashboard');
+          }}
+        />
       </main>
     </div>
   );
 }
-

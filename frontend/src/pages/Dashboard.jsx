@@ -1,15 +1,60 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardSidebar from '../components/DashboardSidebar';
+import { useAuth } from '../context/AuthContext';
+import { apiRequest } from '../services/api';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  const [interviewStats, setInterviewStats] = useState({
+    total: 0,
+    average: '—',
+    highest: '—',
+    thisMonth: 0,
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    apiRequest('/interviews/my')
+      .then((res) => {
+        if (isMounted && res && res.success) {
+          const interviews = res.interviews || [];
+          const now = new Date();
+          const thisMonthCount = interviews.filter((i) => {
+            if (!i.date) return false;
+            const d = new Date(i.date);
+            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+          }).length;
+
+          setInterviewStats({
+            total: res.stats?.total ?? interviews.length,
+            average: res.stats?.average ?? '—',
+            highest: res.stats?.highest ?? '—',
+            thisMonth: thisMonthCount,
+          });
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const displayName = user?.name || 'User';
 
   const stats = [
-    { label: 'Total Interviews', value: '0', icon: '🎯' },
-    { label: 'Average Score', value: '—', icon: '📊' },
-    { label: 'Highest Score', value: '—', icon: '🏆' },
-    { label: 'Interviews This Month', value: '0', icon: '📅' }
+    { label: 'Total Interviews', value: interviewStats.total },
+    { label: 'Average Score', value: interviewStats.average },
+    { label: 'Highest Score', value: interviewStats.highest },
+    { label: 'Interviews This Month', value: interviewStats.thisMonth },
   ];
 
   const mainActions = [
@@ -18,7 +63,7 @@ export default function Dashboard() {
       description: 'Prepare for an upcoming interview using AI-generated questions based on your resume and approved interview data.',
       buttonText: 'Start Practicing',
       route: '/interview-setup',
-      badge: null
+      badge: null,
     },
     {
       title: 'Post Interview Experience',
@@ -26,7 +71,7 @@ export default function Dashboard() {
       note: 'Requires admin approval before publication.',
       buttonText: 'Share Experience',
       route: '/post-experience',
-      badge: 'Moderated'
+      badge: 'Moderated',
     },
     {
       title: 'Post Interview Questions',
@@ -34,15 +79,15 @@ export default function Dashboard() {
       note: 'Questions are reviewed before being added to the approved question database.',
       buttonText: 'Submit Questions',
       route: '/post-questions',
-      badge: 'Moderated'
+      badge: 'Moderated',
     },
     {
       title: 'Results & Statistics',
       description: 'View your previous mock interviews, scores, performance, and progress.',
       buttonText: 'View Results',
       route: '/results',
-      badge: null
-    }
+      badge: null,
+    },
   ];
 
   return (
@@ -54,7 +99,7 @@ export default function Dashboard() {
       <main className="dashboard-main">
         {/* 1. Welcome Header */}
         <header className="dash-welcome-header">
-          <h1 className="dash-title">Welcome to your interview dashboard</h1>
+          <h1 className="dash-title">Welcome, {displayName}</h1>
           <p className="dash-subtitle">Prepare smarter. Practice better. Track your progress.</p>
         </header>
 
@@ -63,7 +108,6 @@ export default function Dashboard() {
           <div className="dash-stats-grid">
             {stats.map((stat, idx) => (
               <div key={idx} className="dash-stat-card glass-panel">
-                <div className="stat-icon">{stat.icon}</div>
                 <div className="stat-details">
                   <div className="stat-value">{stat.value}</div>
                   <div className="stat-label">{stat.label}</div>
@@ -82,7 +126,7 @@ export default function Dashboard() {
                 {action.badge && <span className="action-badge">{action.badge}</span>}
                 <h3 className="action-card-title">{action.title}</h3>
                 <p className="action-card-desc">{action.description}</p>
-                {action.note && <p className="action-card-note">ℹ️ {action.note}</p>}
+                {action.note && <p className="action-card-note">{action.note}</p>}
                 <button
                   className="btn-primary action-card-btn"
                   onClick={() => navigate(action.route)}
@@ -140,14 +184,12 @@ export default function Dashboard() {
             </p>
             <div className="dash-submissions-grid">
               <div className="submission-card glass-panel">
-                <div className="sub-icon">📝</div>
                 <div className="sub-info">
                   <span className="sub-title">Interview Experiences</span>
                   <span className="sub-status">0 pending</span>
                 </div>
               </div>
               <div className="submission-card glass-panel">
-                <div className="sub-icon">❓</div>
                 <div className="sub-info">
                   <span className="sub-title">Interview Questions</span>
                   <span className="sub-status">0 pending</span>
@@ -160,13 +202,56 @@ export default function Dashboard() {
           <section className="dash-section flex-1">
             <h2 className="dash-section-title">Recent Activity</h2>
             <div className="dash-empty-card glass-panel">
-              <div className="empty-icon">📂</div>
               <h4 className="empty-title">No interview activity yet</h4>
               <p className="empty-desc">
                 Complete your first mock interview to see your results here.
               </p>
             </div>
           </section>
+        </div>
+
+        {/* Fixed Bottom-Left Logout & User Status Bar */}
+        <div
+          className="fixed-bottom-logout"
+          style={{
+            position: 'fixed',
+            bottom: '20px',
+            left: '20px',
+            zIndex: 1000,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            background: 'rgba(18, 24, 36, 0.95)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '8px',
+            padding: '10px 14px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(8px)',
+          }}
+        >
+          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+            Logged in as: <strong style={{ color: '#f8fafc' }}>{displayName}</strong>
+          </span>
+          <button
+            type="button"
+            onClick={handleLogout}
+            style={{
+              backgroundColor: '#ef4444',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '8px 16px',
+              fontWeight: 500,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s ease',
+              textAlign: 'center',
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#dc2626')}
+            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#ef4444')}
+          >
+            Logout
+          </button>
         </div>
       </main>
     </div>

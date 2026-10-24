@@ -2,10 +2,16 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardSidebar from '../components/DashboardSidebar';
 import Auth3D from '../three/Auth3D';
+import SuccessModal from '../components/SuccessModal';
+import { apiRequest } from '../services/api';
 
 export default function PostInterviewExperience() {
   const navigate = useNavigate();
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [serverError, setServerError] = useState('');
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [popupMessage, setPopupMessage] = useState('');
 
   // Form State
   const [formData, setFormData] = useState({
@@ -14,17 +20,12 @@ export default function PostInterviewExperience() {
     interviewType: 'Technical',
     interviewMode: 'Online',
     interviewDate: '',
-    numberOfRounds: '3',
-    rounds: [
-      { id: 1, roundNumber: 1, type: 'Technical', description: '' }
-    ],
-    questions: [
-      { id: 1, text: '' }
-    ],
+    rounds: [{ id: 1, roundNumber: 1, type: 'Technical', description: '' }],
+    questions: [{ id: 1, text: '' }],
     experience: '',
     preparation: '',
     difficulty: 'Medium',
-    status: 'pending'
+    status: 'pending',
   });
 
   const [errors, setErrors] = useState({});
@@ -36,27 +37,29 @@ export default function PostInterviewExperience() {
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: '' }));
     }
+    setServerError('');
   };
 
   // Rounds Handler
   const handleRoundChange = (id, field, value) => {
     setFormData((prev) => ({
       ...prev,
-      rounds: prev.rounds.map((r) => (r.id === id ? { ...r, [field]: value } : r))
+      rounds: prev.rounds.map((r) => (r.id === id ? { ...r, [field]: value } : r)),
     }));
     if (errors.rounds) {
       setErrors((prev) => ({ ...prev, rounds: '' }));
     }
+    setServerError('');
   };
 
   const addRound = () => {
-    const nextId = formData.rounds.length > 0 ? Math.max(...formData.rounds.map(r => r.id)) + 1 : 1;
+    const nextId = formData.rounds.length > 0 ? Math.max(...formData.rounds.map((r) => r.id)) + 1 : 1;
     setFormData((prev) => ({
       ...prev,
       rounds: [
         ...prev.rounds,
-        { id: nextId, roundNumber: prev.rounds.length + 1, type: 'Technical', description: '' }
-      ]
+        { id: nextId, roundNumber: prev.rounds.length + 1, type: 'Technical', description: '' },
+      ],
     }));
   };
 
@@ -64,7 +67,7 @@ export default function PostInterviewExperience() {
     if (formData.rounds.length <= 1) return;
     setFormData((prev) => ({
       ...prev,
-      rounds: prev.rounds.filter((r) => r.id !== id).map((r, idx) => ({ ...r, roundNumber: idx + 1 }))
+      rounds: prev.rounds.filter((r) => r.id !== id).map((r, idx) => ({ ...r, roundNumber: idx + 1 })),
     }));
   };
 
@@ -72,18 +75,19 @@ export default function PostInterviewExperience() {
   const handleQuestionChange = (id, value) => {
     setFormData((prev) => ({
       ...prev,
-      questions: prev.questions.map((q) => (q.id === id ? { ...q, text: value } : q))
+      questions: prev.questions.map((q) => (q.id === id ? { ...q, text: value } : q)),
     }));
     if (errors.questions) {
       setErrors((prev) => ({ ...prev, questions: '' }));
     }
+    setServerError('');
   };
 
   const addQuestion = () => {
-    const nextId = formData.questions.length > 0 ? Math.max(...formData.questions.map(q => q.id)) + 1 : 1;
+    const nextId = formData.questions.length > 0 ? Math.max(...formData.questions.map((q) => q.id)) + 1 : 1;
     setFormData((prev) => ({
       ...prev,
-      questions: [...prev.questions, { id: nextId, text: '' }]
+      questions: [...prev.questions, { id: nextId, text: '' }],
     }));
   };
 
@@ -91,7 +95,7 @@ export default function PostInterviewExperience() {
     if (formData.questions.length <= 1) return;
     setFormData((prev) => ({
       ...prev,
-      questions: prev.questions.filter((q) => q.id !== id)
+      questions: prev.questions.filter((q) => q.id !== id),
     }));
   };
 
@@ -110,20 +114,21 @@ export default function PostInterviewExperience() {
       interviewType: 'Technical',
       interviewMode: 'Online',
       interviewDate: '',
-      numberOfRounds: '3',
       rounds: [{ id: 1, roundNumber: 1, type: 'Technical', description: '' }],
       questions: [{ id: 1, text: '' }],
       experience: '',
       preparation: '',
       difficulty: 'Medium',
-      status: 'pending'
+      status: 'pending',
     });
     setErrors({});
+    setServerError('');
   };
 
-  // Form Submit Handler
-  const handleSubmit = (e) => {
+  // Form Submit Handler (Connected to Backend API)
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setServerError('');
 
     const newErrors = {};
     if (!formData.company.trim()) newErrors.company = 'Company name is required.';
@@ -158,9 +163,51 @@ export default function PostInterviewExperience() {
       return;
     }
 
-    // Frontend simulation successful -> Show Pending Review confirmation
-    console.log('Interview Experience Submitted (Frontend State):', formData);
-    setIsSubmitted(true);
+    // Prepare payload matching backend schema (WITHOUT numberOfRounds)
+    const payload = {
+      companyName: formData.company.trim(),
+      company: formData.company.trim(),
+      role: formData.role.trim(),
+      interviewType: formData.interviewType,
+      interviewMode: formData.interviewMode,
+      interviewDate: formData.interviewDate || null,
+      rounds: formData.rounds.map((r, idx) => ({
+        roundNumber: idx + 1,
+        type: r.type,
+        description: r.description.trim(),
+      })),
+      questionsAsked: formData.questions
+        .map((q) => q.text.trim())
+        .filter(Boolean),
+      questions: formData.questions.map((q) => ({
+        text: q.text.trim(),
+      })),
+      experience: formData.experience.trim(),
+      preparation: formData.preparation ? formData.preparation.trim() : '',
+      difficulty: formData.difficulty,
+    };
+
+    setLoading(true);
+    try {
+      const response = await apiRequest('/submissions/experiences', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+
+      if (response.success) {
+        setShowSuccessPopup(true);
+        setPopupMessage(
+          'Your experience has been submitted successfully.\n\nIt will be reviewed and approved/rejected by the admin.\n\nThank you for contributing!'
+        );
+        setIsSubmitted(true);
+      } else {
+        setServerError(response.message || 'Failed to submit experience. Please try again.');
+      }
+    } catch (err) {
+      setServerError('Something went wrong. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const typeOptions = ['Technical', 'HR / Behavioral', 'Technical + HR', 'Other'];
@@ -185,7 +232,7 @@ export default function PostInterviewExperience() {
             Help other PSG students prepare by sharing what you experienced during your interview.
           </p>
           <div className="subtle-notice">
-            <span>ℹ️</span> Your submission will be reviewed by an admin before it is published.
+            Your submission will be reviewed by an admin before it is published.
           </div>
         </header>
 
@@ -193,7 +240,6 @@ export default function PostInterviewExperience() {
         {isSubmitted ? (
           <div className="setup-container">
             <div className="glass-panel confirmation-box">
-              <div className="confirmation-icon">⏳</div>
               <span className="confirmation-badge">Pending Review</span>
               <h2 className="dash-section-title" style={{ marginTop: '1rem', marginBottom: '0.5rem' }}>
                 Experience Submitted
@@ -221,7 +267,6 @@ export default function PostInterviewExperience() {
           /* Multi-Section Submission Form */
           <div className="setup-container">
             <form onSubmit={handleSubmit} className="setup-form-card glass-panel" noValidate>
-
               {/* SECTION 1 — INTERVIEW DETAILS */}
               <div className="form-section">
                 <h3 className="section-label">1. Interview Details</h3>
@@ -318,26 +363,6 @@ export default function PostInterviewExperience() {
               {/* SECTION 2 — INTERVIEW PROCESS */}
               <div className="form-section">
                 <h3 className="section-label">2. Interview Process</h3>
-                
-                <div className="form-group mb-2">
-                  <label htmlFor="numberOfRounds" className="form-label">
-                    Number of Rounds <span className="required-star">*</span>
-                  </label>
-                  <select
-                    id="numberOfRounds"
-                    name="numberOfRounds"
-                    value={formData.numberOfRounds}
-                    onChange={handleInputChange}
-                    className="form-input form-select"
-                    style={{ maxWidth: '220px' }}
-                  >
-                    {['1', '2', '3', '4', '5', '6+'].map((r) => (
-                      <option key={r} value={r} style={{ background: '#121824', color: '#fff' }}>
-                        {r} {r === '1' ? 'Round' : 'Rounds'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
 
                 <div className="rounds-list">
                   {formData.rounds.map((round) => (
@@ -499,32 +524,63 @@ export default function PostInterviewExperience() {
 
               {/* SUBMISSION NOTICE */}
               <div className="info-callout">
-                <span>🛡️</span>
                 <div>
                   <strong>Review before submission:</strong> Your interview experience will be reviewed by a Local Admin or Global Admin before it is published. Only approved content will be visible to other students and used as approved interview data.
                 </div>
               </div>
 
+              {/* Server Error Message */}
+              {serverError && (
+                <div
+                  style={{
+                    padding: '0.75rem 1rem',
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    border: '1px solid #ef4444',
+                    borderRadius: 'var(--radius-sm)',
+                    color: '#fca5a5',
+                    fontSize: '0.85rem',
+                    marginTop: '1rem',
+                  }}
+                >
+                  {serverError}
+                </div>
+              )}
+
               {/* FORM ACTIONS */}
-              <div className="setup-actions">
-                <button type="submit" className="btn-primary setup-start-btn">
-                  Submit Experience
+              <div className="setup-actions" style={{ marginTop: '1.5rem' }}>
+                <button
+                  type="submit"
+                  className="btn-primary setup-start-btn"
+                  disabled={loading}
+                  style={{ opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}
+                >
+                  {loading ? 'Submitting Experience...' : 'Submit Experience'}
                 </button>
-                <button type="button" className="btn-secondary" onClick={handleClearForm}>
+                <button type="button" className="btn-secondary" onClick={handleClearForm} disabled={loading}>
                   Clear Form
                 </button>
                 <button
                   type="button"
                   className="btn-secondary setup-back-btn"
                   onClick={() => navigate('/dashboard')}
+                  disabled={loading}
                 >
                   Cancel
                 </button>
               </div>
-
             </form>
           </div>
         )}
+        {/* Success Modal Popup */}
+        <SuccessModal
+          isOpen={showSuccessPopup}
+          title="Submitted Successfully"
+          message={popupMessage}
+          onClose={() => {
+            setShowSuccessPopup(false);
+            navigate('/dashboard');
+          }}
+        />
       </main>
     </div>
   );

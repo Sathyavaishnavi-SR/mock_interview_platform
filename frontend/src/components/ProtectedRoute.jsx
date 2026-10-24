@@ -1,23 +1,42 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 /**
- * ProtectedRoute Component Placeholder
- * Will eventually enforce role-based access control (user, local_admin, global_admin)
+ * ProtectedRoute Component
+ * Restricts access to authenticated users and verifies role-based permissions.
  */
 export default function ProtectedRoute({ children, allowedRoles }) {
-  // Placeholder condition: Pass-through during initial architecture stage
-  const isAuthenticated = true;
-  const userRole = 'user'; // 'user' | 'local_admin' | 'global_admin'
+  const { isAuthenticated, user, loading } = useAuth();
+  const location = useLocation();
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+  if (loading) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'var(--text-secondary)',
+          background: 'var(--bg-primary)',
+        }}
+      >
+        Authenticating...
+      </div>
+    );
   }
 
-  if (allowedRoles && !allowedRoles.includes(userRole)) {
+  // Redirect unauthenticated visitors to /login
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Role-based access check (user, local_admin, global_admin)
+  const currentRole = user?.role || 'user';
+  if (allowedRoles && !allowedRoles.includes(currentRole)) {
     return <Navigate to="/dashboard" replace />;
   }
 
   return children;
 }
-

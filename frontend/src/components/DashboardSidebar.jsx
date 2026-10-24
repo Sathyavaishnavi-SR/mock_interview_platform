@@ -1,17 +1,28 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function DashboardSidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   const menuItems = [
-    { label: 'Dashboard', path: '/dashboard', icon: '🏠' },
-    { label: 'Practice Interview', path: '/interview-setup', icon: '🎯' },
-    { label: 'Post Interview Experience', path: '/post-experience', icon: '📝' },
-    { label: 'Post Interview Questions', path: '/post-questions', icon: '❓' },
-    { label: 'Results & Statistics', path: '/results', icon: '📊' },
+    { label: 'Dashboard', path: '/dashboard' },
+    { label: 'Practice Interview', path: '/interview-setup' },
+    { label: 'Post Interview Experience', path: '/post-experience' },
+    { label: 'Post Interview Questions', path: '/post-questions' },
+    { label: 'Results & Statistics', path: '/results' },
   ];
+
+  const displayName = user?.name || 'User';
+  const initial = displayName.charAt(0).toUpperCase();
 
   return (
     <>
@@ -26,7 +37,7 @@ export default function DashboardSidebar() {
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label="Toggle Dashboard Menu"
         >
-          {mobileOpen ? '✕' : '☰'}
+          {mobileOpen ? 'Close' : 'Menu'}
         </button>
       </div>
 
@@ -45,7 +56,7 @@ export default function DashboardSidebar() {
           {/* User Welcome Greeting */}
           <div className="sidebar-user-greeting">
             <span className="greeting-label">Welcome,</span>
-            <span className="user-name">Student</span>
+            <span className="user-name">{displayName}</span>
           </div>
 
           {/* Main Menu */}
@@ -61,7 +72,6 @@ export default function DashboardSidebar() {
                     className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
                     onClick={() => setMobileOpen(false)}
                   >
-                    <span className="nav-icon">{item.icon}</span>
                     <span className="nav-text">{item.label}</span>
                   </Link>
                 );
@@ -70,18 +80,41 @@ export default function DashboardSidebar() {
           </div>
         </div>
 
-        {/* Sidebar Footer User Info */}
+        {/* Sidebar Footer User Info & Logout */}
         <div className="sidebar-bottom">
           <div className="user-info-card">
-            <div className="user-avatar">S</div>
+            <div className="user-avatar">{initial}</div>
             <div className="user-details">
-              <span className="user-role-name">Student</span>
+              <span className="user-role-name">{displayName}</span>
               <span className="user-status-badge">Logged In</span>
             </div>
           </div>
+
+          <button
+            type="button"
+            className="sidebar-logout-btn"
+            onClick={handleLogout}
+            style={{
+              width: '100%',
+              marginTop: '0.75rem',
+              padding: '8px 16px',
+              backgroundColor: '#ef4444',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              fontWeight: 500,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s ease',
+              textAlign: 'center',
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#dc2626')}
+            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#ef4444')}
+          >
+            Logout
+          </button>
         </div>
       </aside>
     </>
   );
 }
-
